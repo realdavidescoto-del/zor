@@ -3,98 +3,324 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title> Zor Code — Open-source AI coding agent</title>
+<meta name="description" content="Zor Code — open-source AI coding agent for the terminal. 27 providers, local models, MCP.">
+<title>Zor Code — Open-source AI coding agent</title>
 <style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #9b59b6;
+    --accent-dim: #7d3c98;
+    --code-bg: #0d1117;
+    --radius: 6px;
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d0d1a; color: #e0e0e0; line-height: 1.6; }
-  .container { max-width: 800px; margin: 0 auto; padding: 40px 20px; }
-  h1 { font-size: 3em; color: #9b59b6; margin-bottom: 10px; }
-  h2 { font-size: 1.2em; color: #888; margin-bottom: 30px; font-weight: normal; }
-  h3 { color: #9b59b6; margin: 30px 0 10px; }
-  pre { background: #1a1a2e; padding: 16px; border-radius: 8px; overflow-x: auto; border: 1px solid #333; }
-  code { color: #a0d2db; font-size: 0.9em; }
-  a { color: #9b59b6; }
-  .badge { display: inline-flex; gap: 10px; margin: 20px 0; }
-  .badge span { background: #9b59b6; color: #fff; padding: 4px 12px; border-radius: 4px; font-size: 0.85em; }
-  .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 20px 0; }
-  .feature { background: #1a1a2e; padding: 16px; border-radius: 8px; border: 1px solid #333; }
-  .feature strong { color: #9b59b6; }
-  footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #333; color: #666; font-size: 0.85em; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 16px;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .wrap { max-width: 960px; margin: 0 auto; padding: 48px 24px; }
+
+  nav {
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  nav .inner {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+  }
+  nav .logo { font-weight: 600; font-size: 18px; color: var(--accent); }
+  nav .links { display: flex; gap: 16px; align-items: center; }
+  nav .links a { color: var(--text); font-size: 14px; }
+  nav .links a:hover { color: var(--accent); text-decoration: none; }
+
+  .gh-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 5px 12px;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--surface);
+    transition: border-color .15s;
+  }
+  .gh-link:hover { border-color: var(--accent); text-decoration: none; }
+  .gh-link svg { width: 16px; height: 16px; fill: var(--text); }
+
+  header.hero {
+    padding: 64px 0 40px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .pill-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .pill {
+    display: inline-block;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .pill.accent { border-color: var(--accent); color: var(--accent); }
+
+  h1 { font-size: 40px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 12px; }
+  h1 .purple { color: var(--accent); }
+  .subtitle { font-size: 20px; color: var(--muted); font-weight: 400; margin-bottom: 24px; max-width: 620px; }
+
+  .desc { font-size: 16px; color: var(--muted); max-width: 640px; margin-bottom: 32px; }
+
+  .cta-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 20px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border: 1px solid var(--accent);
+  }
+  .btn-primary:hover { background: var(--accent-dim); }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  section { padding: 48px 0; border-bottom: 1px solid var(--border); }
+  section:last-of-type { border-bottom: none; }
+
+  h2 {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .section-desc { color: var(--muted); font-size: 15px; margin-bottom: 24px; }
+
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  pre code { color: #7ee787; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; }
+  pre .dim { color: var(--muted); }
+  pre .key { color: #f2cc60; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    transition: border-color .15s;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card h3 { font-size: 15px; font-weight: 600; color: var(--accent); margin-bottom: 6px; }
+  .card p { font-size: 14px; color: var(--muted); line-height: 1.5; }
+
+  .install-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .install-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .install-card .os { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+  .install-card code { font-size: 13px; color: #7ee787; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; word-break: break-all; }
+
+  .footer {
+    border-top: 1px solid var(--border);
+    padding: 32px 0;
+    color: var(--muted);
+    font-size: 13px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+  .footer a { color: var(--muted); }
+  .footer a:hover { color: var(--accent); text-decoration: none; }
+
+  @media (max-width: 600px) {
+    h1 { font-size: 30px; }
+    .subtitle { font-size: 17px; }
+    .wrap { padding: 32px 16px; }
+    section { padding: 32px 0; }
+    .grid { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
-<div class="container">
 
-<h1>Zor Code</h1>
-<h2>Open-source AI coding agent for the terminal</h2>
+<nav>
+  <div class="inner">
+    <span class="logo">Zor Code</span>
+    <div class="links">
+      <a href="#install">Install</a>
+      <a href="#features">Features</a>
+      <a href="#commands">Commands</a>
+      <a href="https://github.com/zor-ai/zor" class="gh-link" target="_blank" rel="noopener">
+        <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        View on GitHub
+      </a>
+    </div>
+  </div>
+</nav>
 
-<div class="badge">
-  <span>MIT License</span>
-  <span>27 Providers</span>
-  <span>Bun</span>
-  <span>TypeScript</span>
-</div>
+<div class="wrap">
+  <header class="hero">
+    <div class="pill-row">
+      <span class="pill accent">MIT License</span>
+      <span class="pill">27 Providers</span>
+      <span class="pill">Bun</span>
+      <span class="pill">TypeScript</span>
+    </div>
+    <h1><span class="purple">Zor</span> Code</h1>
+    <p class="subtitle">Open-source AI coding agent for the terminal</p>
+    <p class="desc">Multi-provider, local models, MCP support, sub-agents. Live model switching across 27 LLM providers. No lock-in.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="#install">Get started</a>
+      <a class="btn btn-ghost" href="https://github.com/zor-ai/zor" target="_blank" rel="noopener">Documentation</a>
+    </div>
+  </header>
 
-<p>
-  Zor Code is an AI-powered coding assistant that lives in your terminal.
-  Part of the Zor ecosystem — Code (terminal), Cowork (IDE), Chat (web).
-  Multi-provider, local models, MCP support, sub-agents.
-  Live model switching mid-chat across 27 LLM providers.
-</p>
+  <section id="install">
+    <h2>Install</h2>
+    <p class="section-desc">One command. Requires <a href="https://bun.sh" target="_blank" rel="noopener">Bun</a> (auto-installed if missing).</p>
+    <div class="install-grid">
+      <div class="install-card">
+        <div class="os">macOS / Linux</div>
+        <code>curl -fsSL https://raw.githubusercontent.com/zor-ai/zor/main/install.sh | sh</code>
+      </div>
+      <div class="install-card">
+        <div class="os">Windows PowerShell</div>
+        <code>irm https://raw.githubusercontent.com/zor-ai/zor/main/install.ps1 | iex</code>
+      </div>
+      <div class="install-card">
+        <div class="os">Homebrew</div>
+        <code>brew install zor-code</code>
+      </div>
+      <div class="install-card">
+        <div class="os">npm</div>
+        <code>npm install -g zor-code</code>
+      </div>
+    </div>
+  </section>
 
-<h3>Install</h3>
-<pre><code># macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/zor-ai/zor/main/install.sh | sh
+  <section>
+    <h2>Quick start</h2>
+    <p class="section-desc">Set your API key and go.</p>
+    <pre><code><span class="dim"># Set your key. Choose any provider.</span>
+zor-code keys set opencode <span class="key">&lt;your-api-key&gt;</span>
 
-# Windows PowerShell
-irm https://raw.githubusercontent.com/zor-ai/zor/main/install.ps1 | iex
-
-# Homebrew
-brew install zor-code
-
-# npm
-npm install -g zor-code</code></pre>
-
-<h3>Quick Start</h3>
-<pre><code>zor-code keys set opencode &lt;your-api-key&gt;
+<span class="dim"># Launch the TUI</span>
 zor-code</code></pre>
+  </section>
 
-<h3>Features</h3>
-<div class="features">
-  <div class="feature"><strong>27 Providers</strong><br>Anthropic, OpenAI, Google, DeepSeek, Ollama, NVIDIA, and more</div>
-  <div class="feature"><strong>BYOK</strong><br>Bring your own keys. No lock-in</div>
-  <div class="feature"><strong>Local Models</strong><br>Ollama support for fully offline use</div>
-  <div class="feature"><strong>MCP Support</strong><br>Connect to MCP servers for custom tools</div>
-  <div class="feature"><strong>Session Branching</strong><br>/fork conversations like Git</div>
-  <div class="feature"><strong>Sub-Agents</strong><br>Spawn explorer, reviewer, debugger, builder</div>
-  <div class="feature"><strong>Permission Gate</strong><br>Auto/confirm/plan/deny modes</div>
-  <div class="feature"><strong>Rich TUI</strong><br>Ink-based terminal UI with cursor editing</div>
+  <section id="features">
+    <h2>Features</h2>
+    <p class="section-desc">Everything you need to ship code from the terminal.</p>
+    <div class="grid">
+      <div class="card">
+        <h3>27 Providers</h3>
+        <p>Anthropic, OpenAI, Google, DeepSeek, OpenRouter, Groq, Mistral, xAI, Together, Perplexity, Cohere, Cerebras, NVIDIA, HuggingFace, and more.</p>
+      </div>
+      <div class="card">
+        <h3>Bring your own keys</h3>
+        <p>Use your own API keys. No lock-in to any platform. Switch providers mid-chat.</p>
+      </div>
+      <div class="card">
+        <h3>Local models</h3>
+        <p>Ollama integration for fully offline use. Auto-detects running Ollama instances.</p>
+      </div>
+      <div class="card">
+        <h3>MCP support</h3>
+        <p>Connect to MCP servers for custom tools. stdio and SSE transports. SSRF protection built in.</p>
+      </div>
+      <div class="card">
+        <h3>Session branching</h3>
+        <p>Fork conversations like Git. Try alternative approaches without losing context.</p>
+      </div>
+      <div class="card">
+        <h3>Sub-agents</h3>
+        <p>Spawn explorer, reviewer, debugger, builder as isolated agents for parallel work.</p>
+      </div>
+      <div class="card">
+        <h3>Permission gate</h3>
+        <p>Auto / confirm / plan / deny modes for destructive operations. Full control.</p>
+      </div>
+      <div class="card">
+        <h3>Rich terminal UI</h3>
+        <p>Ink-based TUI with cursor editing, history, tab-completion, checkpoints, and status bar.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="commands">
+    <h2>Slash Commands</h2>
+    <p class="section-desc">Control everything without leaving the terminal. Type <code>/help</code> inside the TUI to see them all.</p>
+    <pre><code><span class="dim">/model</span>   &lt;p/m&gt;           Switch model mid-chat
+<span class="dim">/use</span>                     Interactive model picker
+<span class="dim">/keys</span>    list|set|remove  Manage API keys
+<span class="dim">/effort</span>  off|low|...|high Change thinking level
+<span class="dim">/fork</span>                    Branch conversation
+<span class="dim">/compact</span>                 Force context compaction
+<span class="dim">/resume</span>  [id]            Session picker
+<span class="dim">/context</span>                 Token and context stats
+<span class="dim">/init</span>                    Guided setup wizard
+<span class="dim">/status</span>                  Active model, tools, connections
+<span class="dim">/help</span>                    Show all commands</code></pre>
+  </section>
+
 </div>
 
-<h3>Slash Commands</h3>
-<pre><code>/model &lt;p/m&gt;    Switch model mid-chat
-/use            Interactive model picker
-/keys           Manage API keys
-/fork           Branch conversation
-/compact        Force context compaction
-/resume         Session picker (↑↓/Enter/Esc)
-/context        Token + context stats
-/init           Guided setup wizard
-/help           All commands</code></pre>
-
-<h3>Links</h3>
-<p>
-  <a href="https://github.com/zor-ai/zor">GitHub</a> &middot;
-  <a href="https://github.com/zor-ai/zor/blob/main/CONTRIBUTING.md">Contributing</a> &middot;
-  <a href="https://github.com/zor-ai/zor/blob/main/SECURITY.md">Security</a> &middot;
-  <a href="/schema.json">Schema</a>
-</p>
-
-<footer>
-  MIT Licensed. Built with Bun, Ink, pi-ai, pi-agent-core.
+<footer class="footer" style="max-width:960px;margin:0 auto;padding:24px 24px;">
+  <div>
+    MIT Licensed &mdash; Built with Bun, Ink, pi-ai, pi-agent-core.
+  </div>
+  <div style="display:flex;gap:20px;">
+    <a href="https://github.com/zor-ai/zor" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://github.com/zor-ai/zor/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing</a>
+    <a href="https://github.com/zor-ai/zor/blob/main/SECURITY.md" target="_blank" rel="noopener">Security</a>
+    <a href="/schema.json">Schema</a>
+  </div>
 </footer>
 
-</div>
 </body>
 </html>
-2026-07-03T12:22:52.8442271-07:00
