@@ -13,6 +13,7 @@ export const ZorConfigSchema = Type.Object({
   permissions: Type.Union([
     Type.Literal('auto'),
     Type.Literal('confirm'),
+    Type.Literal('plan'),
     Type.Literal('deny'),
   ], { default: 'confirm' }),
   sandbox: Type.Boolean({ default: false }),
