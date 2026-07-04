@@ -22,7 +22,7 @@
     "@earendil-works/pi-agent-core": "^0.79.8",
     "@earendil-works/pi-ai": "^0.79.8",
     "@sinclair/typebox": "^0.32.0",
-    "glob": "^10.3.0",
+    "glob": "^13.0.6",
     "ink": "^4.4.1",
     "react": "^18.2.0",
     "tiktoken": "^1.0.22"
