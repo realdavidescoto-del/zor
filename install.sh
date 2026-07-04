@@ -44,7 +44,9 @@ else
 fi
 
 echo ""
-echo "Zor Code v0.1.0 installed!"
+echo "Zor Code installed!"
+VERSION=$(bun zor-code --version 2>/dev/null || echo "latest")
+echo "Version: $VERSION"
 echo "Restart terminal or run: source ${RC}"
 echo ""
 echo "Quick start:"

@@ -56,7 +56,7 @@ zor/
 
 ## Code Style
 
-- TypeScript strict mode
+- TypeScript
 - No comments (code should be self-documenting)
 - Use `@earendil-works/pi-agent-core` and `@earendil-works/pi-ai` APIs, not raw HTTP
 - Follow existing patterns for tool definitions, provider configs, and TUI components

@@ -35,7 +35,7 @@
     "type": "git",
     "url": "https://github.com/zor-ai/zor"
   },
-  "homepage": "https://github.com/zor-ai/zor",
+  "homepage": "https://zor-ai.github.io/zor",
   "bugs": "https://github.com/zor-ai/zor/issues",
   "keywords": ["ai", "coding-agent", "claude", "terminal", "cli", "developer-tools"],
   "license": "MIT"

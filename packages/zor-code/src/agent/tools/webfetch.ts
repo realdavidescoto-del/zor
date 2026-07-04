@@ -30,10 +30,11 @@ export const webFetchTool: AgentTool = {
   }),
   execute: async (_id, params): Promise<AgentToolResult<any>> => {
     try {
-      validateUrl(params.url);
+      const { url, format } = params as Record<string, any>;
+      validateUrl(url);
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 30000);
-      const res = await fetch(params.url, {
+      const res = await fetch(url, {
         signal: controller.signal,
         headers: { 'User-Agent': 'ZorCode/0.1.0' },
       });
@@ -43,7 +44,7 @@ export const webFetchTool: AgentTool = {
       const isHtml = contentType.includes('text/html') || contentType.includes('application/xhtml');
       const text = await res.text();
 
-      if (params.format === 'html' || isHtml) {
+      if (format === 'html' || isHtml) {
         const truncated = text.slice(0, 100_000);
         return { content: [{ type: 'text' as const, text: truncated }], details: { contentType } };
       }

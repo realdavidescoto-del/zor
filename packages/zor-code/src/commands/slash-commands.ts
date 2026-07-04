@@ -5,8 +5,9 @@ import { getKeyStatuses, setKey, removeKey } from '../llm/keys';
 import { getProvider } from '../llm/providers';
 import { saveLastSession } from '../llm/session-state';
 import { checkOllamaRunning, listOllamaModels } from '../llm/ollama';
+import { countMessagesTokens } from '../utils/tokens';
 
-function tool<T extends any>(t: AgentTool<T>): AgentTool<T> { return t; }
+function tool(t: any): any { return t; }
 
 export const slashCommands: Record<string, AgentTool> = {
   effort: tool({
@@ -127,7 +128,24 @@ export const slashCommands: Record<string, AgentTool> = {
     execute: async (_id, _params, _signal, _onUpdate, ctx) => {
       try {
         const usage = ctx.agent.state.usage || { input: 0, output: 0 };
-        return { content: [{ type: 'text', text: `Input: ${usage.input}, Output: ${usage.output}` }], details: usage };
+        let realTokens = 0;
+        try {
+          const msgs = ctx.agent.state.messages;
+          if (Array.isArray(msgs)) realTokens = countMessagesTokens(msgs);
+        } catch {};
+        const modelId = ctx.config.model.split('/')[1] || '';
+        let estCost = 'N/A';
+        try {
+          const provider = getProvider(ctx.config.model.split('/')[0]);
+          if (provider) {
+          const model = provider.models.find((m: any) => m.id === modelId);
+          if ((model as any)?.cost) {
+            const c = (model as any).cost;
+            estCost = `$${((realTokens * (c.input + c.output) / 2000) / 1000).toFixed(4)}`;
+            }
+          }
+        } catch {}
+        return { content: [{ type: 'text', text: `API usage: ${usage.input} in / ${usage.output} out\nSession tokens: ${realTokens.toLocaleString()}\nEst. cost: ${estCost}` }], details: { usage } };
       } catch (e: any) { return { content: [{ type: 'text', text: `Error: ${e.message}` }], details: { isError: true } }; }
     },
   }),

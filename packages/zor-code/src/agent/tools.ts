@@ -2,7 +2,7 @@ import { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import { Type } from '@sinclair/typebox';
 import * as fs from 'fs';
 import * as path from 'path';
-import { execSync, spawnSync } from 'child_process';
+import { execSync, spawnSync, spawn } from 'child_process';
 import { ToolSearch } from './tools/search';
 import { webFetchTool } from './tools/webfetch';
 import { taskTool } from './subagent';
@@ -35,9 +35,37 @@ export const coreTools: AgentTool[] = [
     label: 'bash',
     description: 'Execute shell commands in the project directory.',
     parameters: Type.Object({ command: Type.String({ description: 'Shell command to execute' }) }),
-    execute: async (_id, params) => {
+    execute: async (_id, params, _signal, onUpdate) => {
       try {
-        const stdout = execSync(params.command, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024, timeout: 30000 });
+        const { command } = params as Record<string, any>;
+        if (onUpdate) {
+          return new Promise((resolve) => {
+            let stdout = '';
+            let stderr = '';
+            const [bin, ...args] = process.platform === 'win32'
+              ? ['cmd', '/d', '/s', '/c', command]
+              : ['sh', '-c', command];
+            const proc = spawn(bin, args, { timeout: 30000 });
+            proc.stdout.on('data', (data: Buffer) => {
+              const chunk = data.toString();
+              stdout += chunk;
+              onUpdate({ content: [{ type: 'text' as const, text: chunk }], details: {} });
+            });
+            proc.stderr.on('data', (data: Buffer) => {
+              const chunk = data.toString();
+              stderr += chunk;
+              onUpdate({ content: [{ type: 'text' as const, text: chunk }], details: {} });
+            });
+            proc.on('close', (code) => {
+              const output = stdout + (stderr ? stderr : '');
+              resolve(result(output || 'Command completed'));
+            });
+            proc.on('error', (err) => {
+              resolve(result(`Failed to start process: ${err.message}`, { isError: true }));
+            });
+          });
+        }
+        const stdout = execSync(command, { encoding: 'utf8', maxBuffer: 10 * 1024 * 1024, timeout: 30000 });
         return result(stdout || 'Command completed');
       } catch (e: any) {
         return result(e.stdout?.toString() || e.stderr?.toString() || `exit code ${e.status ?? 1}`, { isError: true });
@@ -55,7 +83,8 @@ export const coreTools: AgentTool[] = [
     }),
     execute: async (_id, params) => {
       try {
-        const content = readFileContent(params.filepath, params.offset || 0, params.limit || 2000);
+        const { filepath, offset, limit } = params as Record<string, any>;
+        const content = readFileContent(filepath, offset || 0, limit || 2000);
         return result(content);
       } catch (e: any) {
         return result(`Error: ${e.message}`, { isError: true });
@@ -72,10 +101,11 @@ export const coreTools: AgentTool[] = [
     }),
     execute: async (_id, params) => {
       try {
-        const safePath = validatePath(params.filepath);
+        const { filepath, content: fileContent } = params as Record<string, any>;
+        const safePath = validatePath(filepath);
         fs.mkdirSync(path.dirname(safePath), { recursive: true });
-        fs.writeFileSync(safePath, params.content, 'utf8');
-        return result(`Written ${safePath} (${params.content.length} bytes)`);
+        fs.writeFileSync(safePath, fileContent, 'utf8');
+        return result(`Written ${safePath} (${fileContent.length} bytes)`);
       } catch (e: any) {
         return result(`Error: ${e.message}`, { isError: true });
       }
@@ -92,14 +122,15 @@ export const coreTools: AgentTool[] = [
     }),
     execute: async (_id, params) => {
       try {
-        const safePath = validatePath(params.filepath);
+        const { filepath, oldString, newString } = params as Record<string, any>;
+        const safePath = validatePath(filepath);
         const content = fs.readFileSync(safePath, 'utf8');
-        if (!content.includes(params.oldString)) {
-          return result(`Error: String not found in ${params.filepath}`, { isError: true });
+        if (!content.includes(oldString)) {
+          return result(`Error: String not found in ${filepath}`, { isError: true });
         }
-        const newContent = content.replace(params.oldString, params.newString);
+        const newContent = content.replace(oldString, newString);
         fs.writeFileSync(safePath, newContent, 'utf8');
-        return result(`Edited ${params.filepath}`);
+        return result(`Edited ${filepath}`);
       } catch (e: any) {
         return result(`Error: ${e.message}`, { isError: true });
       }
@@ -114,8 +145,9 @@ export const coreTools: AgentTool[] = [
     }),
     execute: async (_id, params) => {
       try {
+        const { pattern } = params as Record<string, any>;
         const { globSync } = await import('glob');
-        const files = globSync(params.pattern, { nodir: true, cwd: process.cwd(), absolute: false }).slice(0, 200);
+        const files = globSync(pattern, { nodir: true, cwd: process.cwd(), absolute: false }).slice(0, 200);
         return result(files.length > 0 ? files.join('\n') : 'No files found');
       } catch (e: any) {
         return result(`Glob error: ${e.message}`, { isError: true });
@@ -132,16 +164,17 @@ export const coreTools: AgentTool[] = [
     }),
     execute: async (_id, params) => {
       try {
-        const args = ['--line-number', '--with-filename', params.pattern];
-        if (params.include) args.push('--include', params.include);
+        const { pattern, include } = params as Record<string, any>;
+        const args = ['--line-number', '--with-filename', pattern];
+        if (include) args.push('--include', include);
         const proc = spawnSync('rg', [...args, '.'], { encoding: 'utf8', maxBuffer: 1024 * 1024 });
         if (proc.error) {
           if (process.platform === 'win32') {
             try {
-              const psArgs = ['-Command', `Select-String -Path * -Pattern '${params.pattern.replace(/'/g, "''")}' -Recurse | Select-Object -First 100 | ForEach-Object { $_.Filename + ':' + $_.LineNumber + ':' + $_.Line }`];
-              if (params.include) {
-                const ext = params.include.replace('*.', '');
-                psArgs[1] = `Select-String -Path *.${ext} -Pattern '${params.pattern.replace(/'/g, "''")}' -Recurse | Select-Object -First 100 | ForEach-Object { $_.Filename + ':' + $_.LineNumber + ':' + $_.Line }`;
+              const psArgs = ['-Command', `Select-String -Path * -Pattern '${pattern.replace(/'/g, "''")}' -Recurse | Select-Object -First 100 | ForEach-Object { $_.Filename + ':' + $_.LineNumber + ':' + $_.Line }`];
+              if (include) {
+                const ext = include.replace('*.', '');
+                psArgs[1] = `Select-String -Path *.${ext} -Pattern '${pattern.replace(/'/g, "''")}' -Recurse | Select-Object -First 100 | ForEach-Object { $_.Filename + ':' + $_.LineNumber + ':' + $_.Line }`;
               }
               const psProc = spawnSync('powershell', psArgs, { encoding: 'utf8', maxBuffer: 1024 * 1024 });
               if (psProc.error) {
@@ -169,7 +202,8 @@ export const coreTools: AgentTool[] = [
     }),
     execute: async (_id, params) => {
       try {
-        const safePath = validatePath(params.filepath);
+        const { filepath } = params as Record<string, any>;
+        const safePath = validatePath(filepath);
         const entries = fs.readdirSync(safePath, { withFileTypes: true });
         const lines = entries.map((e: fs.Dirent) => {
           const suffix = e.isDirectory() ? '/' : '';
@@ -212,9 +246,10 @@ const gitTools: AgentTool[] = [
     }),
     execute: async (_id, params) => {
       try {
+        const { staged, file } = params as Record<string, any>;
         const args = ['diff'];
-        if (params.staged) args.push('--staged');
-        if (params.file) args.push('--', params.file);
+        if (staged) args.push('--staged');
+        if (file) args.push('--', file);
         const stdout = execSync(['git', ...args].join(' '), { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 10000 });
         return result(stdout || '(no changes)');
       } catch (e: any) {
@@ -231,7 +266,7 @@ const gitTools: AgentTool[] = [
     }),
     execute: async (_id, params) => {
       try {
-        const n = params.count || 10;
+        const n = (params as Record<string, any>).count || 10;
         const stdout = execSync(`git log --oneline -n ${n}`, { encoding: 'utf8', timeout: 5000 });
         return result(stdout || '(no commits)');
       } catch (e: any) {
@@ -248,8 +283,9 @@ const gitTools: AgentTool[] = [
     }),
     execute: async (_id, params) => {
       try {
-        const stdout = execSync(`git add ${params.files}`, { encoding: 'utf8', timeout: 5000 });
-        return result(stdout || `Staged: ${params.files}`);
+        const { files } = params as Record<string, any>;
+        const stdout = execSync(`git add ${files}`, { encoding: 'utf8', timeout: 5000 });
+        return result(stdout || `Staged: ${files}`);
       } catch (e: any) {
         return result(e.stderr?.toString() || `Failed to stage: ${e.message}`, { isError: true });
       }
@@ -264,7 +300,8 @@ const gitTools: AgentTool[] = [
     }),
     execute: async (_id, params) => {
       try {
-        const escaped = params.message.replace(/"/g, '\\"');
+        const { message } = params as Record<string, any>;
+        const escaped = message.replace(/"/g, '\\"');
         const stdout = execSync(`git commit -m "${escaped}"`, { encoding: 'utf8', timeout: 10000 });
         return result(stdout || 'Commit created');
       } catch (e: any) {
@@ -284,9 +321,11 @@ export function buildToolSet(config: any, mcpClient: any, sandbox?: Sandbox): Ag
     if (t.name !== 'Bash') return t;
     return {
       ...t,
-      execute: async (_id: string, params: any) => {
+      execute: async (_id: string, params: any, _signal: any, onUpdate: any) => {
         try {
-          const { stdout, stderr, exitCode } = await sandbox.exec(params.command, 30000);
+          const cmd = (params as Record<string, any>).command;
+          onUpdate?.({ content: [{ type: 'text' as const, text: `[sandbox] Running: ${cmd.slice(0, 100)}...\n` }], details: {} });
+          const { stdout, stderr, exitCode } = await sandbox.exec(cmd, 30000);
           const output = (stdout + (stderr ? '\n' + stderr : '')).slice(0, 50000);
           return result(output || 'Command completed');
         } catch (e: any) {

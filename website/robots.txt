@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://zor-ai.github.io/zor/sitemap.xml

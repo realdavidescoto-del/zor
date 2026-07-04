@@ -31,9 +31,11 @@ if ($currentPath -notlike "*$BinDir*") {
   Write-Host "Added $BinDir to User PATH" -ForegroundColor Yellow
 }
 
+$version = & bun zor-code --version 2>$null
+if (-not $version) { $version = "latest" }
 Write-Host @"
 
-Zor Code v0.1.0 installed!
+Zor Code installed! ($version)
 
 Quick start:
   zor-code keys set opencode <your-key>

@@ -4,8 +4,7 @@
 
 Report security vulnerabilities to:
 
-- **GitHub Issues** (preferred): [Create a security advisory](https://github.com/zor-ai/zor/security/advisories/new)
-- **Email**: `security@zor.dev` (PGP key available on request)
+- **GitHub Issues**: [Create a security advisory](https://github.com/zor-ai/zor/security/advisories/new)
 
 **Response time**: 48 hours for initial acknowledgment. Target fix within 7 days for critical issues.
 

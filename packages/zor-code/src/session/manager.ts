@@ -64,7 +64,7 @@ export class SessionManager {
 
   getTree(rootId: string): any {
     const sessions = this.list();
-    const map = new Map(sessions.map(s => [s.id, { ...s, children: [] }]));
+    const map: Map<string, any> = new Map(sessions.map(s => [s.id, { ...s, children: [] as any[] }]));
     for (const s of sessions) {
       if (s.parentId && map.has(s.parentId)) {
         map.get(s.parentId)!.children.push(map.get(s.id)!);

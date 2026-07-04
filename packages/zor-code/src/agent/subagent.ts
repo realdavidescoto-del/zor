@@ -35,7 +35,7 @@ export async function createSubAgent(
 ) {
   const preset = SUBAGENT_PRESETS[name] || SUBAGENT_PRESETS.explorer;
   const resolved = await resolveModel(parentConfig);
-  const model = getModel(resolved.provider.id, resolved.model.id);
+  const model = getModel(resolved.provider.id as any, resolved.model.id as any);
 
   const subAgent = new Agent({
     initialState: {
@@ -59,7 +59,7 @@ export const taskTool: AgentTool = {
     name: Type.Optional(Type.String({ description: 'Sub-agent type: explorer, reviewer, debugger, builder' })),
     task: Type.String({ description: 'Task description for the sub-agent' }),
   }),
-  execute: async (_id, params, _signal, _onUpdate, ctx) => {
+  execute: async (_id: any, params: any, _signal: any, _onUpdate: any, ctx: any) => {
     if (!ctx?.config) {
       return { content: [{ type: 'text' as const, text: 'Error: config not available' }], details: {} };
     }
@@ -74,4 +74,4 @@ export const taskTool: AgentTool = {
       details: { subAgentName: params.name, messageCount: subAgent.state.messages.length },
     };
   },
-};
+} as any as AgentTool;

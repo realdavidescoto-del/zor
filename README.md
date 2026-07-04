@@ -1,6 +1,6 @@
 # Zor
 
-Open-source AI coding agent for the terminal. Part of the Zor ecosystem: **Code** (terminal agent), **Cowork** (IDE integration), **Chat** (web UI).
+Open-source AI coding agent for the terminal.
 
 27 LLM providers. Local models via Ollama. MCP support. Sub-agents.
 

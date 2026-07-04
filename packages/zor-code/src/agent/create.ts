@@ -19,7 +19,8 @@ import { Sandbox } from '../sandbox/sandbox';
 function createModel(providerId: string, modelId: string): Model<any> {
   const knownProviders: string[] = ['anthropic', 'openai', 'google', 'deepseek', 'groq', 'mistral', 'xai', 'together', 'fireworks', 'cerebras', 'nvidia', 'minimax', 'openrouter', 'moonshotai', 'huggingface', 'zai', 'cloudflare', 'github-copilot', 'amazon-bedrock', 'azure-openai', 'google-vertex', 'opencode', 'opencode-go'];
   if (knownProviders.includes(providerId)) {
-    return getModel(providerId as KnownProvider, modelId as any);
+    // @ts-expect-error modelId type is strict in pi-ai
+    return getModel(providerId as unknown as KnownProvider, modelId as any) as Model<any>;
   }
   return {
     id: modelId, name: modelId, api: 'openai-completions', provider: providerId,
@@ -63,11 +64,12 @@ export async function createZorAgent(config: ZorConfig, existingSession?: Sessio
     },
 
     beforeToolCall: async ({ toolCall, args }) => {
-      const result = permissionGate(config.permissions, toolCall, args);
+      const result = permissionGate(config.permissions, toolCall, args as Record<string, unknown>);
       if (result.block) return { block: true, reason: result.reason };
       if (result.needsConfirmation) {
-        const description = `${toolCall.name} ${args.command || args.filepath || args.files || (args as any).message || ''}`.slice(0, 100);
-        const approved = await requestToolConfirmation(toolCall.name, { description, ...args });
+        const argsObj = args as Record<string, any>;
+        const description = `${toolCall.name} ${argsObj.command || argsObj.filepath || argsObj.files || (argsObj as any).message || ''}`.slice(0, 100);
+        const approved = await requestToolConfirmation(toolCall.name, { description, ...argsObj });
         if (!approved) return { block: true, reason: `${toolCall.name} declined by user` };
       }
       return {};

@@ -261,6 +261,7 @@ function App({ initialConfig, existingSession }: { initialConfig: ZorConfig; exi
   const [pickerSessions, setPickerSessions] = useState<SessionData[]>([]);
   const [confirmInfo, setConfirmInfo] = useState<{ toolName: string; args: any } | null>(null);
   const confirmResolveRef = useRef<((approved: boolean) => void) | null>(null);
+  const MULTILINE_HEIGHT = 6;
   const inputRef = useRef('');
   const savedInputRef = useRef('');
   const submitRef = useRef<(text: string) => void>((t: string) => {});
@@ -310,13 +311,49 @@ function App({ initialConfig, existingSession }: { initialConfig: ZorConfig; exi
                 setMessages(prev => [...prev, { role: 'system', content: `Error: ${errMsg}` }]);
               }
               break;
-            case 'tool_execution_start':
+            case 'tool_execution_update':
+              if (event.partialResult?.content) {
+                const text = event.partialResult.content.map((c: any) => c.text || '').join('');
+                if (text) {
+                  setMessages(prev => {
+                    const last = prev[prev.length - 1];
+                    if (last && last.role === 'tool' && last.content.startsWith(event.toolName || 'Bash')) {
+                      return [...prev.slice(0, -1), { ...last, content: last.content + text }];
+                    }
+                    return [...prev, { role: 'tool', content: text }];
+                  });
+                }
+              }
+              break;
               if ((event.toolName === 'Write' || event.toolName === 'Edit') && event.args?.filepath) {
                 try {
                   const fp = event.args.filepath;
                   if (existsSync(fp)) {
                     checkpointsRef.current.push({ path: fp, content: readFileSync(fp, 'utf8') });
                     if (checkpointsRef.current.length > 20) checkpointsRef.current.shift();
+                  }
+                } catch {}
+              }
+              {
+                const argsShort = event.args ? JSON.stringify(event.args).slice(0, 120) : '';
+                setMessages(prev => [...prev, { role: 'tool', content: `${event.toolName} ${argsShort}` }]);
+              }
+              break;
+            case 'turn_end':
+              if (event.message) {
+                try {
+                  const agent = agentRef;
+                  if (agent) {
+                    const newMsgs = agent.state.messages;
+                    setMessages(prev => {
+                      const existing = new Set(prev.map(m => `${m.role}:${m.content.slice(0, 80)}`));
+                      const toAdd = newMsgs.filter((m: any) => !existing.has(`${m.role}:${(typeof m.content === 'string' ? m.content : '').slice(0, 80)}`));
+                      const toolResults = toAdd.filter((m: any) => m.role === 'tool_result' || m.role === 'tool');
+                      return [...prev, ...toolResults.map((m: any) => {
+                        const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content);
+                        return { role: m.role || 'tool_result', content: content.slice(0, 5000) };
+                      })];
+                    });
                   }
                 } catch {}
               }
@@ -533,6 +570,30 @@ function App({ initialConfig, existingSession }: { initialConfig: ZorConfig; exi
       return;
     }
 
+    if (cmd === 'export') {
+      if (!ctx) { setIsProcessing(false); return; }
+      try {
+        const exportDir = join(require('os').homedir(), '.zor', 'exports');
+        const { mkdirSync, writeFileSync } = require('fs');
+        mkdirSync(exportDir, { recursive: true });
+        const date = new Date().toISOString().split('T')[0];
+        const filename = `zor-session-${date}-${ctx.session.id.slice(-8)}.md`;
+        const filepath = join(exportDir, filename);
+        const msgs = ctx.agent.state.messages;
+        let md = `# Zor Session Export\n\n**Date:** ${new Date().toISOString()}\n**Session:** ${ctx.session.id}\n**Model:** ${config.model}\n\n---\n\n`;
+        for (const m of msgs) {
+          const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content);
+          md += `### ${m.role}\n\n${content}\n\n`;
+        }
+        writeFileSync(filepath, md, 'utf8');
+        setMessages(prev => [...prev, { role: 'assistant', content: `Session exported to ${filepath} (${msgs.length} messages)` }]);
+      } catch (e: any) {
+        setMessages(prev => [...prev, { role: 'assistant', content: `Export failed: ${e.message}` }]);
+      }
+      setIsProcessing(false);
+      return;
+    }
+
     if (!ctx) { setIsProcessing(false); return; }
 
     const tool = slashCommands[cmd];
@@ -723,6 +784,14 @@ function App({ initialConfig, existingSession }: { initialConfig: ZorConfig; exi
       inputRef.current = val;
       setInput(val);
       setCursorPos(val.length);
+      return;
+    }
+
+    if (key.return && key.shift) {
+      const pos = cursorPos;
+      inputRef.current = inputRef.current.slice(0, pos) + '\n' + inputRef.current.slice(pos);
+      setInput(inputRef.current);
+      setCursorPos(pos + 1);
       return;
     }
 
@@ -924,14 +993,17 @@ function App({ initialConfig, existingSession }: { initialConfig: ZorConfig; exi
         </Box>
       )}
       <Box borderStyle="single" borderColor="dim" padding={1}>
-        <Box flexDirection="row">
-          <Text color="cyan">› </Text>
-          <Text>{input.slice(0, cursorPos)}{!input && <Text color="dim">Type a task... (/help)</Text>}</Text>
-          <Text color="dim" bold>{input.slice(cursorPos, cursorPos + 1) || (cursorPos === 0 && input.length === 0 ? '' : ' ')}</Text>
-          <Text>{input.slice(cursorPos + 1)}</Text>
-          <Text color="dim">█</Text>
+        <Box flexDirection="column">
+          {input.split('\n').map((line, li, arr) => (
+            <Box key={li} flexDirection="row">
+              <Text color="cyan">{li === 0 ? '› ' : '  '}</Text>
+              <Text>{line || (input.length === 0 && li === 0 ? <Text color="dim">Type a task... (/help)</Text> : '')}</Text>
+              {li === arr.length - 1 && <Text color="dim">█</Text>}
+            </Box>
+          ))}
+          {!input && <Box flexDirection="row"><Text color="cyan">› </Text><Text color="dim">Type a task... (/help)</Text><Text color="dim">█</Text></Box>}
         </Box>
-        <Text color="dim">{sessionName ? `[${sessionName}] ` : ''}{model} | effort:{effort} | [{permMode}] Shift+Tab to cycle</Text>
+        <Text color="dim">{sessionName ? `[${sessionName}] ` : ''}{model} | effort:{effort} | [{permMode}]{input.includes('\n') ? ' [MULTI]' : ''} Shift+Tab to cycle | Shift+Enter for newline</Text>
       </Box>
       </>)}
     </Box>

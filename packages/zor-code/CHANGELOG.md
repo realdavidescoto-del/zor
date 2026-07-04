@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.0 — 2026-07-03
+
+### Added
+- Sub-agents now have tools: explorer/reviewer/debugger get read-only tools, builder gets full tools
+- Interactive permission confirm mode: y/n prompts in TUI for destructive tool calls
+- Sandbox isolation wired to Bash tool (opt-in via `"sandbox": true` in zor.json)
+- 5 Git tools: GitStatus, GitDiff, GitLog, GitAdd, GitCommit
+- `.zorrules` support: reads `~/.zor/rules.md`, `./.zor/rules.md`, `./ZOR.md`, `./.zorrules`
+- Real tokenizer (tiktoken, cl100k_base encoder) for accurate token counting
+- Website: favicon, Open Graph / Twitter Card meta tags, robots.txt, canonical URL
+
+### Changed
+- System prompt trimmed (~200 tokens saved), Git awareness + rules added to tool list
+- Context compaction: extracts task, file changes, errors, key actions instead of static placeholder
+- Install scripts: dynamic version detection instead of hardcoded `v0.1.0`
+- All `zor.dev` references updated to `zor-ai.github.io/zor`
+- Root README: install URL fixed, provider count corrected (19+ → 27)
+
+### Fixed
+- `install.ps1` missing `https://` on bun.sh install URL
+
 ## 0.1.0 — 2026-07-02
 
 ### Added
