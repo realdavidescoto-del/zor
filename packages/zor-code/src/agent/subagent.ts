@@ -3,23 +3,28 @@ import { Agent, AgentTool } from '@earendil-works/pi-agent-core';
 import { getModel } from '@earendil-works/pi-ai';
 import { resolveModel } from '../llm/resolve';
 import type { ZorConfig } from '../config';
+import { coreTools, getReadOnlyTools } from './tools';
 
-const SUBAGENT_PRESETS: Record<string, { name: string; systemPrompt: string }> = {
+const SUBAGENT_PRESETS: Record<string, { name: string; systemPrompt: string; tools: AgentTool[] }> = {
   explorer: {
     name: 'explorer',
     systemPrompt: 'You are an exploration agent. Read files, search code, gather information. Do not modify files. Report findings concisely.',
+    tools: getReadOnlyTools(),
   },
   reviewer: {
     name: 'reviewer',
     systemPrompt: 'You are a code reviewer. Analyze code quality, security issues, and bugs. Provide specific, actionable feedback. Do not modify files.',
+    tools: getReadOnlyTools(),
   },
   debugger: {
     name: 'debugger',
     systemPrompt: 'You are a debugging specialist. Read error logs, trace code paths, identify root causes. Report findings with file paths and line numbers.',
+    tools: getReadOnlyTools(),
   },
   builder: {
     name: 'builder',
     systemPrompt: 'You are a builder. Create files, write code, run tests. Be precise and follow conventions.',
+    tools: [...coreTools],
   },
 };
 
@@ -37,7 +42,7 @@ export async function createSubAgent(
       systemPrompt: preset.systemPrompt + `\n\nTask: ${task}`,
       model,
       thinkingLevel: parentConfig.effort === 'xhigh' ? 'xhigh' : parentConfig.effort as any,
-      tools: [],
+      tools: preset.tools,
       messages: [],
     },
     toolExecution: 'parallel',

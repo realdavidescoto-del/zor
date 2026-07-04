@@ -18,7 +18,7 @@ Open-source AI coding agent that runs in your terminal. Works with 27 LLM provid
 
 ```bash
 # Install via script
-curl -fsSL https://zor.dev/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/zor-ai/zor/main/install.sh | sh
 
 # Or build from source
 bun install
@@ -156,7 +156,7 @@ Configure MCP servers in `zor.json`:
 ## Development
 
 ```bash
-git clone https://github.com/yourusername/zor
+git clone https://github.com/zor-ai/zor
 cd zor/packages/zor-code
 bun install
 
@@ -190,7 +190,7 @@ zor-code/
 │   ├── commands/
 │   │   └── slash-commands.ts   /commands implementation
 │   ├── llm/
-│   │   ├── providers.ts        18+ provider registry
+│   │   ├── providers.ts          27 provider registry
 │   │   ├── keys.ts             API key management
 │   │   ├── resolve.ts          Model resolution
 │   │   └── ollama.ts           Ollama client

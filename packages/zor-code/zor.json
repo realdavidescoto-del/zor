@@ -1,5 +1,5 @@
 {
-  "$schema": "https://zor.dev/schema.json",
+  "$schema": "https://zor-ai.github.io/zor/schema.json",
   "model": "opencode/claude-sonnet-4",
   "effort": "high",
   "permissions": "confirm",

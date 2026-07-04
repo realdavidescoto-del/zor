@@ -14,6 +14,8 @@ import { logger } from './utils/logger';
 import { withRetry } from './utils/retry';
 import { SessionManager, SessionData } from './session/manager';
 import { SessionPicker } from './tui/session-picker';
+import { setConfirmationCallback, getPendingConfirmation, resolveConfirmation } from './permissions/confirm';
+import { countMessagesTokens } from './utils/tokens';
 
 const MAX_INPUT_CHARS = 100_000;
 const IS_PIPED = !process.stdin.isTTY;
@@ -257,6 +259,8 @@ function App({ initialConfig, existingSession }: { initialConfig: ZorConfig; exi
   const [sessionName, setSessionName] = useState<string | undefined>(existingSession?.name);
   const [pickerMode, setPickerMode] = useState<'session' | null>(null);
   const [pickerSessions, setPickerSessions] = useState<SessionData[]>([]);
+  const [confirmInfo, setConfirmInfo] = useState<{ toolName: string; args: any } | null>(null);
+  const confirmResolveRef = useRef<((approved: boolean) => void) | null>(null);
   const inputRef = useRef('');
   const savedInputRef = useRef('');
   const submitRef = useRef<(text: string) => void>((t: string) => {});
@@ -339,6 +343,15 @@ function App({ initialConfig, existingSession }: { initialConfig: ZorConfig; exi
 
   useEffect(() => { initAgent(); }, [initAgent]);
   useEffect(() => { initAgentRef.current = initAgent; }, [initAgent]);
+  useEffect(() => {
+    setConfirmationCallback((info) => {
+      if (info) {
+        setConfirmInfo({ toolName: info.toolName, args: info.args });
+      } else {
+        setConfirmInfo(null);
+      }
+    });
+  }, []);
 
   const handleSlashCommand = useCallback(async (trimmed: string) => {
     const parts = trimmed.slice(1).split(' ');
@@ -378,7 +391,7 @@ function App({ initialConfig, existingSession }: { initialConfig: ZorConfig; exi
 
     if (cmd === 'context' && ctx) {
       const msgs = ctx.agent.state.messages;
-      const tokenEstimate = Math.round(JSON.stringify(msgs).length / 4 * 1.33);
+      const tokenEstimate = countMessagesTokens(msgs);
       const summary = `Context:
   Messages: ${msgs.length}
   Model: ${config.model}
@@ -397,7 +410,7 @@ function App({ initialConfig, existingSession }: { initialConfig: ZorConfig; exi
       const defEffort = await promptLine(`Effort level (off/minimal/low/medium/high/xhigh) [high]: `) || 'high';
       const defPerm = await promptLine(`Permission mode (auto/confirm/plan/deny) [confirm]: `) || 'confirm';
       const zorJson = JSON.stringify({
-        $schema: 'https://zor.dev/schema.json',
+        $schema: 'https://zor-ai.github.io/zor/schema.json',
         model: defModel,
         effort: defEffort,
         permissions: defPerm,
@@ -644,6 +657,11 @@ function App({ initialConfig, existingSession }: { initialConfig: ZorConfig; exi
   useEffect(() => { processingRef.current = isProcessing; }, [isProcessing]);
 
   useInput((inputValue: string, key: any) => {
+    if (confirmInfo && (inputValue === 'y' || inputValue === 'Y' || inputValue === 'n' || inputValue === 'N')) {
+      resolveConfirmation(inputValue === 'y' || inputValue === 'Y');
+      return;
+    }
+
     if (key.escape && key.shift) {
       const cps = checkpointsRef.current;
       if (cps.length > 0) {
@@ -893,6 +911,16 @@ function App({ initialConfig, existingSession }: { initialConfig: ZorConfig; exi
             .map((cmd, i) => (
               <Text key={i} color="cyan">{cmd}</Text>
             ))}
+        </Box>
+      )}
+      {confirmInfo && (
+        <Box borderStyle="single" borderColor="#9b59b6" paddingX={1} marginBottom={1}>
+          <Box flexDirection="column">
+            <Text color="#9b59b6" bold> Confirm tool execution</Text>
+            <Text color="yellow">  Tool: {confirmInfo.toolName}</Text>
+            {confirmInfo.args && <Text color="dim">  {JSON.stringify(confirmInfo.args).slice(0, 200)}</Text>}
+            <Text color="cyan">  Approve? (y/n) </Text>
+          </Box>
         </Box>
       )}
       <Box borderStyle="single" borderColor="dim" padding={1}>

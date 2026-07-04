@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://zor.dev/schema.json",
+  "$id": "https://zor-ai.github.io/zor/schema.json",
   "title": "Zor Config",
   "type": "object",
   "properties": {

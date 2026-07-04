@@ -2,6 +2,7 @@ import { Agent } from '@earendil-works/pi-agent-core';
 import { getModel } from '@earendil-works/pi-ai';
 import type { Model, KnownProvider } from '@earendil-works/pi-ai/base';
 import { permissionGate } from '../permissions/gate';
+import { requestToolConfirmation } from '../permissions/confirm';
 import { compactStrategy } from '../session/compact';
 import { assembleSystemPrompt } from './system-prompt';
 import { buildToolSet } from './tools';
@@ -13,6 +14,7 @@ import { withRetry } from '../utils/retry';
 import { CircuitBreaker } from '../utils/circuit-breaker';
 import type { ZorConfig } from '../config';
 import { resolveModel } from '../llm/resolve';
+import { Sandbox } from '../sandbox/sandbox';
 
 function createModel(providerId: string, modelId: string): Model<any> {
   const knownProviders: string[] = ['anthropic', 'openai', 'google', 'deepseek', 'groq', 'mistral', 'xai', 'together', 'fireworks', 'cerebras', 'nvidia', 'minimax', 'openrouter', 'moonshotai', 'huggingface', 'zai', 'cloudflare', 'github-copilot', 'amazon-bedrock', 'azure-openai', 'google-vertex', 'opencode', 'opencode-go'];
@@ -35,6 +37,7 @@ export async function createZorAgent(config: ZorConfig, existingSession?: Sessio
   sessionManager.prune(1000);
   const rateLimiter = new RateLimiter({ maxRequests: 60, windowMs: 60_000 });
   const circuitBreaker = new CircuitBreaker({ failureThreshold: 3, resetTimeoutMs: 15000 });
+  const sandbox = config.sandbox ? new Sandbox() : undefined;
   const mcpErrors: string[] = [];
 
   for (const serverConfig of config.mcp.servers) {
@@ -55,12 +58,19 @@ export async function createZorAgent(config: ZorConfig, existingSession?: Sessio
       systemPrompt: assembleSystemPrompt(config),
       model,
       thinkingLevel: config.effort as any,
-      tools: buildToolSet(config, mcpClient),
+      tools: buildToolSet(config, mcpClient, sandbox),
       messages: session.messages || [],
     },
 
     beforeToolCall: async ({ toolCall, args }) => {
-      return permissionGate(config.permissions, toolCall, args);
+      const result = permissionGate(config.permissions, toolCall, args);
+      if (result.block) return { block: true, reason: result.reason };
+      if (result.needsConfirmation) {
+        const description = `${toolCall.name} ${args.command || args.filepath || args.files || (args as any).message || ''}`.slice(0, 100);
+        const approved = await requestToolConfirmation(toolCall.name, { description, ...args });
+        if (!approved) return { block: true, reason: `${toolCall.name} declined by user` };
+      }
+      return {};
     },
 
     transformContext: async (messages) => {

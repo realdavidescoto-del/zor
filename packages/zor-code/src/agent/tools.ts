@@ -6,6 +6,7 @@ import { execSync, spawnSync } from 'child_process';
 import { ToolSearch } from './tools/search';
 import { webFetchTool } from './tools/webfetch';
 import { taskTool } from './subagent';
+import { Sandbox } from '../sandbox/sandbox';
 
 function result(text: string, details?: any): AgentToolResult<any> {
   return { content: [{ type: 'text' as const, text }], details: details || {} };
@@ -28,7 +29,7 @@ function readFileContent(filepath: string, offset = 0, limit = 2000): string {
   return selected.join('\n') + (selected.length < lines.length ? `\n... (${lines.length - offset - selected.length} more lines)` : '');
 }
 
-const coreTools: AgentTool[] = [
+export const coreTools: AgentTool[] = [
   {
     name: 'Bash',
     label: 'bash',
@@ -186,7 +187,113 @@ const coreTools: AgentTool[] = [
   },
 ];
 
-export function buildToolSet(config: any, mcpClient: any): AgentTool[] {
+const gitTools: AgentTool[] = [
+  {
+    name: 'GitStatus',
+    label: 'git-status',
+    description: 'Show current git branch and changed files.',
+    parameters: Type.Object({}),
+    execute: async () => {
+      try {
+        const stdout = execSync('git status --porcelain --branch', { encoding: 'utf8', timeout: 5000 });
+        return result(stdout || '(clean working tree)');
+      } catch (e: any) {
+        return result(`Not a git repository or git not available: ${e.message}`, { isError: true });
+      }
+    },
+  },
+  {
+    name: 'GitDiff',
+    label: 'git-diff',
+    description: 'Show unstaged or staged diffs.',
+    parameters: Type.Object({
+      staged: Type.Optional(Type.Boolean({ description: 'Show staged diffs instead of unstaged' })),
+      file: Type.Optional(Type.String({ description: 'Limit diff to specific file' })),
+    }),
+    execute: async (_id, params) => {
+      try {
+        const args = ['diff'];
+        if (params.staged) args.push('--staged');
+        if (params.file) args.push('--', params.file);
+        const stdout = execSync(['git', ...args].join(' '), { encoding: 'utf8', maxBuffer: 5 * 1024 * 1024, timeout: 10000 });
+        return result(stdout || '(no changes)');
+      } catch (e: any) {
+        return result(e.stdout?.toString() || e.message, { isError: true });
+      }
+    },
+  },
+  {
+    name: 'GitLog',
+    label: 'git-log',
+    description: 'Show recent git commit history.',
+    parameters: Type.Object({
+      count: Type.Optional(Type.Number({ description: 'Number of commits to show', default: 10 })),
+    }),
+    execute: async (_id, params) => {
+      try {
+        const n = params.count || 10;
+        const stdout = execSync(`git log --oneline -n ${n}`, { encoding: 'utf8', timeout: 5000 });
+        return result(stdout || '(no commits)');
+      } catch (e: any) {
+        return result(`Not a git repository or git not available: ${e.message}`, { isError: true });
+      }
+    },
+  },
+  {
+    name: 'GitAdd',
+    label: 'git-add',
+    description: 'Stage files for commit.',
+    parameters: Type.Object({
+      files: Type.String({ description: 'File paths to stage (space-separated, use "." for all)' }),
+    }),
+    execute: async (_id, params) => {
+      try {
+        const stdout = execSync(`git add ${params.files}`, { encoding: 'utf8', timeout: 5000 });
+        return result(stdout || `Staged: ${params.files}`);
+      } catch (e: any) {
+        return result(e.stderr?.toString() || `Failed to stage: ${e.message}`, { isError: true });
+      }
+    },
+  },
+  {
+    name: 'GitCommit',
+    label: 'git-commit',
+    description: 'Create a git commit with the given message.',
+    parameters: Type.Object({
+      message: Type.String({ description: 'Commit message' }),
+    }),
+    execute: async (_id, params) => {
+      try {
+        const escaped = params.message.replace(/"/g, '\\"');
+        const stdout = execSync(`git commit -m "${escaped}"`, { encoding: 'utf8', timeout: 10000 });
+        return result(stdout || 'Commit created');
+      } catch (e: any) {
+        return result(e.stdout?.toString() || e.stderr?.toString() || `Failed to commit: ${e.message}`, { isError: true });
+      }
+    },
+  },
+];
+
+export function getReadOnlyTools(): AgentTool[] {
+  return coreTools.filter(t => ['Read', 'Glob', 'Grep', 'Ls'].includes(t.name));
+}
+
+export function buildToolSet(config: any, mcpClient: any, sandbox?: Sandbox): AgentTool[] {
   const mcpTools = mcpClient.getTools();
-  return [...coreTools, ToolSearch(mcpClient), taskTool, ...mcpTools, webFetchTool];
+  const tools = sandbox ? coreTools.map(t => {
+    if (t.name !== 'Bash') return t;
+    return {
+      ...t,
+      execute: async (_id: string, params: any) => {
+        try {
+          const { stdout, stderr, exitCode } = await sandbox.exec(params.command, 30000);
+          const output = (stdout + (stderr ? '\n' + stderr : '')).slice(0, 50000);
+          return result(output || 'Command completed');
+        } catch (e: any) {
+          return result(e.stderr?.toString() || e.stdout?.toString() || `exit code ${e.status ?? 1}`, { isError: true });
+        }
+      },
+    };
+  }) : coreTools;
+  return [...tools, ...gitTools, ToolSearch(mcpClient), taskTool, ...mcpTools, webFetchTool];
 }

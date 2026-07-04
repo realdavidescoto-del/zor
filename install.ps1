@@ -10,7 +10,7 @@ if (-not $bun) {
   $bunPath = "$env:USERPROFILE\.bun\bin\bun.exe"
   if (-not (Test-Path $bunPath)) {
     Write-Host "Installing Bun..." -ForegroundColor Cyan
-    irm bun.sh/install.ps1 | iex
+    irm https://bun.sh/install.ps1 | iex
   }
 }
 
