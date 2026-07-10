@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "^0.79.8",
-    "@earendil-works/pi-ai": "^0.79.8",
+    "@earendil-works/pi-ai": "^0.80.3",
     "@sinclair/typebox": "^0.32.0",
     "glob": "^10.3.0",
     "ink": "^4.4.1",
